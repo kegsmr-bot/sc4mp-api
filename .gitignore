@@ -4,4 +4,3 @@ exclude.txt
 *__pycache__
 *.bat
 *.log
-CLAUDE_JOURNAL.md

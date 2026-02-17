@@ -14,7 +14,7 @@ from inspect import stack
 from os import unlink
 from pathlib import Path
 from socket import socket
-from threading import Thread, current_thread
+from threading import Thread, Lock, current_thread
 
 try:
 	from flask import Flask, jsonify, abort, send_from_directory
@@ -192,6 +192,7 @@ class Scanner(Thread):
 		self.server_queue = SC4MP_SERVERS.copy()
 		self.thread_count = 0
 		self.end = False
+		self.download_lock = Lock()  # Ensure only one server downloads files at a time
 
 
 	def _load_servers_from_disk(self):
@@ -291,11 +292,6 @@ class Scanner(Thread):
 
 								# Update servers dictionary
 								self.servers = self.new_servers
-
-								# Save all servers to disk
-								for server_id, server_data in self.servers.items():
-									self._save_server_to_disk(server_id, server_data)
-
 								self.new_servers = dict()
 								self.server_queue = SC4MP_SERVERS.copy()
 								tried_servers = []
@@ -362,12 +358,19 @@ class Scanner(Thread):
 						self.server_list_0_8()
 						entry["info"] = self.server_info_0_8()
 						if not entry["info"]["private"]:
-							entry["stats"] = self.server_stats_0_8(server_id)
+							with self.parent.download_lock:
+								entry["stats"] = self.server_stats_0_8(server_id)
 					else:
 						self.server_list()
 						entry["info"] = self.server_info()
 						if not entry["info"]["private"]:
-							entry["stats"] = self.server_stats(server_id)
+							with self.parent.download_lock:
+								entry["stats"] = self.server_stats(server_id)
+
+					# Update servers dictionary immediately for live API access
+					if server_id:
+						self.parent.servers[server_id] = entry
+						self.parent._save_server_to_disk(server_id, entry)
 
 				except TimeoutError:
 
