@@ -392,9 +392,10 @@ class Scanner(Thread):
 							with self.parent.download_lock:
 								entry["stats"] = self.server_stats(server_id)
 
-					# Save server to disk immediately after fetching (skip if server_id is empty)
+					# Save server to disk and update live dict immediately after fetching
 					if server_id:
 						self._save_server_to_disk(server_id, entry)
+						self.parent.servers[server_id] = entry
 
 				except TimeoutError:
 
